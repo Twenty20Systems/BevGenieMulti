@@ -1,0 +1,530 @@
+================================================================================
+                     CODE FILES USED IN CONTENT GENERATION
+                              Quick Reference
+================================================================================
+
+TOTAL FILES INVOLVED: 25+ critical code files
+TOTAL LINES OF CODE: 4,500+ lines
+EXTERNAL APIS: 3 (OpenAI, Anthropic, Supabase)
+
+================================================================================
+                           API LAYER (Entry Point)
+================================================================================
+
+app/api/chat/route.ts
+├─ Purpose: Main chat API endpoint
+├─ Methods: POST /api/chat, GET /api/chat
+├─ Responsibilities:
+│  ├─ Validate incoming requests
+│  ├─ Get or create user session
+│  ├─ Load conversation history
+│  ├─ Call orchestrator
+│  └─ Format and return response
+├─ Calls: orchestrator.processChat()
+└─ ~150 lines
+
+app/api/chat/stream/route.ts
+├─ Purpose: Streaming endpoint (future feature)
+├─ Methods: POST /api/chat/stream
+└─ ~100 lines
+
+================================================================================
+                       ORCHESTRATOR - Main Pipeline
+================================================================================
+
+lib/ai/orchestrator.ts (THE HEART OF GENERATION)
+├─ Purpose: Coordinates all 9 generation steps
+├─ Main Function: processChat(request: ChatRequest): ChatResponse
+├─ Implements:
+│  ├─ [STEP 1] detectPersonaSignals()
+│  ├─ [STEP 2] updatePersonaWithSignals()
+│  ├─ [STEP 3] searchKnowledgeBase()
+│  ├─ [STEP 4] getPersonalizedSystemPrompt()
+│  ├─ [STEP 5] openai.chat.completions.create()
+│  ├─ [STEP 6] addConversationMessage()
+│  ├─ [STEP 7] determineGenerationMode()
+│  ├─ [STEP 8] classifyMessageIntent()
+│  └─ [STEP 9] generatePageSpec()
+├─ Exports:
+│  ├─ processChat()
+│  ├─ determineGenerationMode()
+│  ├─ getPersonaDescription()
+│  └─ validateAIConfiguration()
+├─ Dependencies: 8 sub-modules
+└─ ~400 lines
+
+================================================================================
+              AI COMPONENTS - Individual Step Implementations
+================================================================================
+
+[STEP 1-2] lib/ai/persona-detection.ts
+├─ Purpose: Detect and update user persona
+├─ Main Functions:
+│  ├─ detectPersonaSignals(message, persona): Signal[]
+│  ├─ updatePersonaWithSignals(persona, signals): PersonaScores
+│  ├─ getPrimaryPersonaClass(persona): string
+│  └─ Persona patterns & signal detection logic
+├─ Types: PersonaScores, Signal, SignalType
+└─ ~300 lines
+
+[STEP 3] lib/ai/knowledge-search.ts
+├─ Purpose: Search knowledge base for relevant documents
+├─ Main Functions:
+│  ├─ searchKnowledgeBase(query, limit): Document[]
+│  ├─ getContextForLLM(query, persona, limit): string
+│  ├─ getPainPointDocuments(painPoint): Document[]
+│  └─ rankByRelevance(docs, persona): Document[]
+├─ Process:
+│  ├─ Generate embedding for query
+│  ├─ Query Supabase pgvector index
+│  ├─ Filter by persona relevance
+│  └─ Format as markdown context
+├─ Dependencies: embeddings.ts, supabase/queries.ts
+└─ ~250 lines
+
+lib/ai/embeddings.ts
+├─ Purpose: Generate vector embeddings for semantic search
+├─ Main Functions:
+│  ├─ generateEmbedding(text): Promise<number[]>
+│  ├─ getCachedEmbedding(text): number[] | null
+│  └─ Cache management
+├─ API: OpenAI Embeddings API
+│  ├─ Model: text-embedding-3-small
+│  ├─ Dimensions: 1536
+│  └─ Caching layer to reduce API calls
+└─ ~100 lines
+
+[STEP 4] lib/ai/prompts/system.ts
+├─ Purpose: Generate personalized system prompts
+├─ Main Functions:
+│  ├─ getPersonalizedSystemPrompt(persona, context): string
+│  ├─ formatKnowledgeContext(documents): string
+│  └─ PAIN_POINT_PROMPTS map
+├─ Includes:
+│  ├─ Base system instructions
+│  ├─ Persona-specific context
+│  ├─ Pain point guidance
+│  ├─ Knowledge base context
+│  └─ Tone/style specifications
+└─ ~200 lines
+
+[STEP 5] - OpenAI API (external)
+├─ Model: gpt-4o
+├─ Called from: orchestrator.ts
+├─ Method: openai.chat.completions.create()
+├─ Params:
+│  ├─ temperature: 0.7
+│  ├─ max_tokens: 300
+│  └─ model: gpt-4o
+
+[STEP 8] lib/ai/intent-classification.ts
+├─ Purpose: Classify user intent and suggest page type
+├─ Main Function:
+│  ├─ classifyMessageIntent(message, count, persona): IntentAnalysis
+├─ Returns:
+│  ├─ intent: string (exploration, problem_solving, etc.)
+│  ├─ suggestedPageType: PageType
+│  └─ confidence: number (0-1)
+├─ Dependencies: page-specs.ts
+└─ ~150 lines
+
+[STEP 9] lib/ai/page-generator.ts
+├─ Purpose: Generate custom page specifications
+├─ Main Function:
+│  ├─ generatePageSpec(request): Promise<PageGenerationResponse>
+├─ Process:
+│  ├─ Build Claude prompt from context
+│  ├─ Call Claude API
+│  ├─ Validate against BevGeniePage schema
+│  ├─ Retry (max 2x) on validation failure
+│  └─ Return with timing metadata
+├─ API: Anthropic Claude
+│  ├─ Model: claude-opus (or claude-3-5-sonnet)
+│  ├─ Temperature: 0.7
+│  └─ Max tokens: 2000
+├─ Dependencies: page-specs.ts
+└─ ~250 lines
+
+lib/ai/page-specs.ts
+├─ Purpose: Define all page types and structures
+├─ Main Exports:
+│  ├─ BevGeniePage interface
+│  ├─ Section interface
+│  ├─ PageType union (6 types)
+│  ├─ SectionType union (8 types)
+│  ├─ PAGE_TYPE_TEMPLATES object
+│  └─ validatePageSpec() function
+├─ Page Types:
+│  ├─ solution_brief
+│  ├─ feature_showcase
+│  ├─ analytics_dashboard
+│  ├─ case_study
+│  ├─ metrics_tracker
+│  └─ comparison_guide
+├─ Section Types:
+│  ├─ hero, feature_grid, metrics
+│  ├─ comparison, case_study, cta
+│  ├─ testimonial, faq
+└─ ~150 lines
+
+================================================================================
+                        SESSION & PERSISTENCE LAYER
+================================================================================
+
+lib/session/session.ts
+├─ Purpose: Manage user sessions and persistence
+├─ Main Functions:
+│  ├─ getSession(): Promise<Session>
+│  ├─ updatePersona(persona): Promise<void>
+│  ├─ addConversationMessage(role, content, mode): Promise<void>
+│  ├─ getConversationHistory(): Promise<Message[]>
+│  └─ recordPersonaSignal(...): Promise<void>
+├─ Dependencies: supabase/queries.ts, session/types.ts
+└─ ~200 lines
+
+lib/session/types.ts
+├─ Purpose: Type definitions for session management
+├─ Exports:
+│  ├─ PersonaScores interface
+│  ├─ Session interface
+│  ├─ Message interface
+│  ├─ PainPointType union
+│  └─ Other session types
+└─ ~100 lines
+
+lib/session/config.ts
+├─ Purpose: Session configuration constants
+├─ Exports:
+│  ├─ SESSION_CONFIG object
+│  └─ Session timeout settings
+└─ ~50 lines
+
+================================================================================
+                          DATABASE LAYER
+================================================================================
+
+lib/supabase/client.ts
+├─ Purpose: Initialize Supabase client
+├─ Exports:
+│  ├─ supabase client instance
+│  └─ Connection initialization
+└─ ~50 lines
+
+lib/supabase/queries.ts
+├─ Purpose: All database CRUD operations
+├─ Main Functions:
+│  ├─ Session queries (get, update, create)
+│  ├─ Persona queries (fetch, update)
+│  ├─ Signal queries (insert, query)
+│  ├─ Conversation queries (insert, select)
+│  └─ Knowledge queries (vector search)
+├─ Tables Accessed:
+│  ├─ user_sessions
+│  ├─ user_personas
+│  ├─ persona_signals
+│  ├─ conversation_messages
+│  └─ knowledge_documents
+├─ Features:
+│  ├─ pgvector integration for semantic search
+│  ├─ Real-time subscriptions (optional)
+│  └─ Transaction support
+└─ ~300 lines
+
+lib/supabase/page-queries.ts
+├─ Purpose: Page generation related queries
+├─ Functions:
+│  ├─ savePageGeneration()
+│  ├─ getPageHistory()
+│  └─ Page-specific CRUD ops
+└─ ~50 lines
+
+================================================================================
+                        FRONTEND - UI COMPONENTS
+================================================================================
+
+app/genie/page.tsx (MAIN GENIE PAGE)
+├─ Route: /genie
+├─ Purpose: Main page for AI content generation
+├─ Responsibilities:
+│  ├─ Display welcome landing with feature cards
+│  ├─ Show BevGenieVisualLoader during generation
+│  ├─ Render DynamicContent with page specs
+│  ├─ Keep ChatBubble always visible
+│  └─ Handle message sending
+├─ State Management:
+│  ├─ isGenerating: boolean
+│  ├─ loadingProgress: number (0-100)
+│  ├─ generatedContent: BevGeniePage | null
+│  └─ currentQuery: string
+├─ Key Functions:
+│  ├─ handleSendMessage(query: string)
+│  │  ├─ Call /api/chat endpoint
+│  │  ├─ Update progress states
+│  │  └─ Set generated content
+├─ Components Rendered:
+│  ├─ BevGenieVisualLoader (when isGenerating)
+│  ├─ DynamicContent (when generatedContent exists)
+│  └─ ChatBubble (always)
+└─ ~150 lines
+
+components/genie/loading-screen.tsx (BevGenieVisualLoader)
+├─ Purpose: 5-stage visual loading experience
+├─ Component: BevGenieVisualLoader
+├─ Features:
+│  ├─ Full-screen overlay (z-index: 50)
+│  ├─ Dark navy background (95% opacity)
+│  ├─ Centered white card
+│  ├─ 5-stage pipeline visualization
+│  ├─ Real-time progress (0-100%)
+│  ├─ Animated background particles
+│  ├─ Scanning effects for active stages
+│  ├─ Metrics display
+│  ├─ ~10-12 second total duration
+│  └─ Professional animations
+├─ Stages:
+│  1. Understanding Your Question
+│  2. Detecting Your Persona
+│  3. Gathering Intelligence
+│  4. Personalizing Solutions
+│  5. Crafting Your Experience
+├─ Props:
+│  ├─ query: string
+│  └─ onComplete: () => void
+└─ ~250 lines
+
+components/genie/chat-bubble.tsx (ChatBubble)
+├─ Purpose: Chat interface (minimized + expanded)
+├─ Component: ChatBubble
+├─ Minimized State:
+│  ├─ 64x64px circular button (bottom-right)
+│  ├─ Cyan background (#00C8FF)
+│  ├─ Glowing hover effect
+│  ├─ Animated pulse ring
+│  ├─ Tooltip on hover
+│  └─ z-index: 50
+├─ Expanded State:
+│  ├─ 400x600px white card
+│  ├─ Navy header (#0A1930)
+│  ├─ Message history display
+│  ├─ Loading progress bar (when generating)
+│  ├─ Suggested prompts (when empty)
+│  ├─ User/AI message bubbles
+│  ├─ Text input field
+│  └─ Send button
+├─ Props:
+│  ├─ onSendMessage: (message: string) => void
+│  ├─ isLoading?: boolean
+│  └─ loadingProgress?: number
+├─ Features:
+│  ├─ Auto-scroll to latest message
+│  ├─ Enter key to send
+│  ├─ Message history within session
+│  └─ Smooth animations
+└─ ~200 lines
+
+components/genie/dynamic-content.tsx (DynamicContent)
+├─ Purpose: Wrapper for rendering generated pages
+├─ Component: DynamicContent
+├─ Props:
+│  └─ specification: BevGeniePage
+├─ Functionality:
+│  ├─ White background page
+│  ├─ Calls DynamicPageRenderer
+│  └─ Chat bubble remains visible
+└─ ~50 lines
+
+components/dynamic-page-renderer.tsx (DynamicPageRenderer)
+├─ Purpose: Converts page specs to React components
+├─ Component: DynamicPageRenderer
+├─ Renders All Section Types:
+│  ├─ Hero sections (headline + CTA)
+│  ├─ Feature grids (3-4 feature cards)
+│  ├─ Metrics displays (KPI cards)
+│  ├─ Comparison tables
+│  ├─ Case study blocks
+│  ├─ CTA sections
+│  ├─ Testimonial cards
+│  └─ FAQ sections
+├─ Features:
+│  ├─ Professional B2B SaaS design
+│  ├─ Responsive grid layout
+│  ├─ Color system (cyan, navy, green, brown)
+│  ├─ Icon integration (lucide-react)
+│  ├─ Smooth animations
+│  └─ Complete styling
+├─ Props:
+│  └─ page: BevGeniePage
+├─ Dependencies: page-specs.ts, colors.ts, lucide-react
+└─ ~400 lines
+
+================================================================================
+                        STATE MANAGEMENT - HOOKS
+================================================================================
+
+hooks/useChat.ts
+├─ Purpose: Manage chat state and API communication
+├─ Hook: useChat()
+├─ Returns:
+│  ├─ messages: DynamicPageData[]
+│  ├─ generationStatus: { progress, stageName, isGeneratingPage }
+│  ├─ sendMessage(message: string): Promise<void>
+│  └─ clearMessages(): void
+├─ Functionality:
+│  ├─ Tracks message history
+│  ├─ Manages generation status
+│  ├─ Handles API communication
+│  ├─ Updates progress states
+│  └─ Manages chat state
+└─ ~150 lines
+
+hooks/useThinkingStream.ts
+├─ Purpose: Handle streaming responses
+├─ Hook: useThinkingStream()
+├─ Functionality:
+│  ├─ Stream parsing
+│  ├─ Progress tracking
+│  └─ Real-time updates
+└─ ~100 lines
+
+================================================================================
+                        UTILITIES & CONSTANTS
+================================================================================
+
+lib/constants/colors.ts
+├─ Purpose: Design system colors
+├─ Exports:
+│  ├─ cyan: '#00C8FF'
+│  ├─ navy: '#0A1930'
+│  ├─ green: '#198038'
+│  ├─ brown: '#AA6C39'
+│  ├─ white: '#FFFFFF'
+│  ├─ lightGray: '#F5F5F5'
+│  └─ More color definitions
+└─ ~50 lines
+
+lib/utils.ts
+├─ Purpose: General utilities
+├─ Functions:
+│  ├─ cn() - Class name utilities
+│  └─ Other general helpers
+└─ ~100 lines
+
+================================================================================
+                      EXTERNAL DEPENDENCIES
+================================================================================
+
+npm Packages Used:
+├─ openai: For GPT-4o API calls
+├─ @anthropic-ai/sdk: For Claude API calls
+├─ @supabase/supabase-js: For database operations
+├─ lucide-react: For icons throughout UI
+├─ tailwindcss: For styling
+├─ react: Core React library
+├─ next: Next.js framework
+└─ And 10+ more supporting packages
+
+External APIs:
+├─ OpenAI
+│  ├─ GPT-4o for conversational responses
+│  └─ Embeddings for semantic search
+├─ Anthropic
+│  └─ Claude for page specification generation
+└─ Supabase
+   ├─ PostgreSQL database
+   ├─ pgvector for vector search
+   └─ Authentication/Sessions
+
+================================================================================
+                           FILE HIERARCHY
+================================================================================
+
+Entry Points:
+└─ app/api/chat/route.ts
+   └─ Calls orchestrator.processChat()
+
+Main Orchestrator:
+└─ lib/ai/orchestrator.ts
+   ├─ Calls 8 sub-modules
+   └─ Coordinates all 9 steps
+
+Step Implementation Modules:
+├─ lib/ai/persona-detection.ts
+├─ lib/ai/knowledge-search.ts
+├─ lib/ai/embeddings.ts
+├─ lib/ai/prompts/system.ts
+├─ lib/ai/intent-classification.ts
+└─ lib/ai/page-generator.ts
+
+Support Modules:
+├─ lib/ai/page-specs.ts (type definitions)
+├─ lib/session/session.ts (session management)
+├─ lib/session/types.ts (type definitions)
+├─ lib/supabase/queries.ts (database)
+└─ lib/supabase/client.ts (database client)
+
+Frontend:
+├─ app/genie/page.tsx (main page)
+├─ components/genie/loading-screen.tsx
+├─ components/genie/chat-bubble.tsx
+├─ components/genie/dynamic-content.tsx
+├─ components/dynamic-page-renderer.tsx
+└─ hooks/useChat.ts
+
+Utilities:
+├─ lib/constants/colors.ts
+└─ lib/utils.ts
+
+================================================================================
+                          PROCESSING FLOW
+================================================================================
+
+User Message
+    ↓ HTTP POST
+app/api/chat/route.ts
+    ↓ Call
+lib/ai/orchestrator.ts (processChat)
+    ├─ Step 1-2: lib/ai/persona-detection.ts
+    ├─ Step 3: lib/ai/knowledge-search.ts
+    │          + lib/ai/embeddings.ts
+    │          + lib/supabase/queries.ts
+    ├─ Step 4: lib/ai/prompts/system.ts
+    ├─ Step 5: OpenAI API (GPT-4o)
+    ├─ Step 6: lib/session/session.ts
+    │          + lib/supabase/queries.ts
+    ├─ Step 7: orchestrator.ts (inline)
+    ├─ Step 8: lib/ai/intent-classification.ts
+    └─ Step 9: lib/ai/page-generator.ts
+              + Anthropic API (Claude)
+    ↓ HTTP Response
+app/genie/page.tsx
+    ├─ Show: components/genie/loading-screen.tsx
+    ├─ Show: components/dynamic-page-renderer.tsx
+    └─ Show: components/genie/chat-bubble.tsx
+
+================================================================================
+                             SUMMARY
+================================================================================
+
+Total Core Files: 25+
+Total Lines of Code: 4,500+
+Main Orchestrator: 1 file (orchestrator.ts)
+Pipeline Steps: 8 sub-modules
+Database Files: 3 files
+Frontend Files: 6 files
+State Management: 2 hook files
+Type Definitions: 2 files
+Constants/Utils: 2 files
+
+External APIs: 3 (OpenAI, Anthropic, Supabase)
+Database Tables: 5 main tables
+
+No Circular Dependencies: ✓ DAG structure verified
+Module Separation: ✓ Clear responsibility boundaries
+Type Safety: ✓ Full TypeScript coverage
+Error Handling: ✓ Graceful degradation at each step
+
+Status: ✅ PRODUCTION READY
+
+================================================================================
+                      Last Updated: October 29, 2025
+================================================================================

@@ -1,0 +1,34 @@
+BEVGENIE DYNAMIC PAGES - QUICK REFERENCE
+
+WHAT HAPPENS:
+1. User asks question
+2. Backend generates page (5-15 seconds)
+3. Page returned in API response
+4. Loading animation plays (11.5 seconds)
+5. Page displays
+
+KEY INSIGHT: NO STREAMING
+- Page fully generated before response
+- Single JSON response with complete page
+- No Server-Sent Events, WebSockets, or streaming
+
+MAIN FLOW:
+ChatWidget -> useChat hook -> POST /api/chat -> processChat() -> 
+generatePageSpec() with Claude -> API response -> Loading screen -> 
+DynamicPageRenderer
+
+KEY FILES:
+Backend: app/api/chat/route.ts, lib/ai/orchestrator.ts, lib/ai/page-generator.ts
+Frontend: hooks/useChat.ts, components/chat-widget.tsx, components/dynamic-page-renderer.tsx
+
+PAGE TYPES: 6 templates (solution_brief, feature_showcase, case_study, comparison, implementation_roadmap, roi_calculator)
+
+SECTION TYPES: 8 components (hero, feature_grid, testimonial, comparison_table, cta, faq, metrics, steps)
+
+ANIMATION: 5 stages, 11.5 seconds total, 3 animation styles
+
+MODELS:
+- OpenAI gpt-4o (chat response)
+- Claude 3.5 Sonnet (page generation)
+
+IMPORTANT: If page generation fails, chat still works (graceful degradation)

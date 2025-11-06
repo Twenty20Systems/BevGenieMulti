@@ -1,0 +1,361 @@
+================================================================================
+                TWO-PRODUCT ARCHITECTURE: VISUAL GUIDE
+================================================================================
+
+CURRENT STATE (Single Monolithic Product)
+═══════════════════════════════════════════════════════════════════════════════
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│                                                                            │
+│                     PUBLIC INTERNET                                       │
+│                           │                                               │
+│                    🌍 Users (Customers)                                  │
+│                           │                                               │
+│                    ┌──────▼──────┐                                        │
+│                    │   BevGenie   │                                        │
+│                    │  Chat App    │                                        │
+│                    │              │                                        │
+│                    │ ✅ Working   │                                        │
+│                    │ ✅ 90% done  │                                        │
+│                    └──────┬──────┘                                        │
+│                           │                                               │
+│                           │ Uses FULL database access                     │
+│                           │ (Not restricted by RLS)                       │
+│                           │                                               │
+│                    ┌──────▼──────────────────────┐                       │
+│                    │  Supabase Database          │                       │
+│                    │  (PostgreSQL + Auth)        │                       │
+│                    │                             │                       │
+│                    │ ✅ knowledge_documents      │                       │
+│                    │ ✅ prompt_templates         │                       │
+│                    │ ✅ user_sessions            │                       │
+│                    │ ✅ analytics tables         │                       │
+│                    │ ❌ NO RLS POLICIES          │                       │
+│                    │ ❌ FULL ACCESS (RISK!)      │                       │
+│                    └─────────────────────────────┘                       │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
+
+
+INTENDED STATE (Two Products + Security)
+═══════════════════════════════════════════════════════════════════════════════
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│                                                                            │
+│           PUBLIC INTERNET                    INTERNAL NETWORK              │
+│                 │                                    │                     │
+│          🌍 Customers                         👨‍💼 Admin Users                │
+│                 │                                    │                     │
+│         ┌───────▼────────┐                 ┌────────▼──────────┐         │
+│         │                │                 │                   │         │
+│         │  BevGenie      │                 │  Management       │         │
+│         │  (Product 1)   │                 │  System           │         │
+│         │                │                 │  (Product 2)      │         │
+│         │ ✅ Chat app    │                 │                   │         │
+│         │ ✅ AI pipeline │                 │ ✅ Admin dash     │         │
+│         │ ✅ Analytics   │                 │ ✅ KB management  │         │
+│         │ ✅ Page render │                 │ ✅ Prompt editor  │         │
+│         │                │                 │ ✅ Analytics view │         │
+│         │ Access: PUBLIC │                 │                   │         │
+│         │                │                 │ Access: ADMIN     │         │
+│         └────────┬───────┘                 └────────┬──────────┘         │
+│                  │                                   │                     │
+│                  │ Limited by RLS                    │ Full Access         │
+│                  │ (Read content, write analytics)   │ (All operations)    │
+│                  │                                   │                     │
+│                  └──────────────┬────────────────────┘                     │
+│                                 │                                         │
+│                        ┌────────▼────────────────────┐                    │
+│                        │                             │                    │
+│                        │  Shared Supabase Database   │                    │
+│                        │  (PostgreSQL + Auth)        │                    │
+│                        │                             │                    │
+│                        │ 🔒 RLS Policies Enabled     │                    │
+│                        │                             │                    │
+│                        │ Product 1 can:              │                    │
+│                        │ ├─ READ: content tables     │                    │
+│                        │ ├─ WRITE: analytics only    │                    │
+│                        │ └─ Cannot delete/modify     │                    │
+│                        │                             │                    │
+│                        │ Product 2 can:              │                    │
+│                        │ ├─ READ: everything         │                    │
+│                        │ ├─ WRITE: everything        │                    │
+│                        │ └─ MANAGE: content/prompts  │                    │
+│                        │                             │                    │
+│                        └─────────────────────────────┘                    │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
+
+
+CURRENT SECURITY GAP
+═══════════════════════════════════════════════════════════════════════════════
+
+                        ⚠️ VULNERABILITY ⚠️
+
+    If attacker compromises BevGenie app:
+
+    ┌─────────────────────────────────────────┐
+    │ BevGenie App (COMPROMISED)              │
+    │                                         │
+    │ ✅ Can read ANY data                   │
+    │ ✅ Can write ANY data                  │
+    │ ✅ Can delete ANY data                 │
+    │ ✅ Can drop tables                     │
+    │ ✅ Full database compromise!           │
+    └────────────────┬────────────────────────┘
+                     │
+                     ↓ (full access)
+            ┌────────────────────┐
+            │  Database         │
+            │  COMPROMISED ⚠️     │
+            └────────────────────┘
+
+
+AFTER PHASE 1 (Implemented Security)
+═══════════════════════════════════════════════════════════════════════════════
+
+                        ✅ PROTECTED ✅
+
+    If attacker compromises BevGenie app:
+
+    ┌─────────────────────────────────────────┐
+    │ BevGenie App (COMPROMISED)              │
+    │                                         │
+    │ ❌ Can read analytics only             │
+    │ ❌ Can write analytics only            │
+    │ ❌ Cannot delete                       │
+    │ ❌ Cannot modify schema                │
+    │ ✅ Limited damage possible!            │
+    └────────────────┬────────────────────────┘
+                     │
+                     ↓ (limited by RLS)
+            ┌────────────────────┐
+            │  Database         │
+            │  PROTECTED ✅       │
+            │                    │
+            │ Content safe:      │
+            │ ├─ Can't delete    │
+            │ ├─ Can't modify    │
+            │ └─ Only read-only  │
+            └────────────────────┘
+
+
+IMPLEMENTATION TIMELINE
+═══════════════════════════════════════════════════════════════════════════════
+
+PHASE 1: SECURITY HARDENING (1-2 weeks) 🔴 CRITICAL
+├─ Day 1-2:  RLS Policy Creation
+│   ├─ Create bevgenie_role
+│   ├─ Create admin_role
+│   └─ Apply policies to all tables
+│
+├─ Day 3-4:  Service Key Separation
+│   ├─ Generate SUPABASE_BEVGENIE_KEY
+│   ├─ Generate SUPABASE_ADMIN_KEY
+│   └─ Update environment variables
+│
+├─ Day 5-7:  Database Access Refactoring
+│   ├─ Create content-reader.ts (read-only)
+│   ├─ Create analytics-writer.ts (write-only)
+│   ├─ Create session-manager.ts
+│   └─ Update all files to use abstraction
+│
+└─ Day 8:    Testing & Verification
+    ├─ Test RLS policies
+    ├─ Verify security
+    └─ Document everything
+
+
+PHASE 2: CODE ORGANIZATION (1 week)
+├─ Create @bevgenie/shared npm package
+├─ Plan repository structure
+├─ Document product boundaries
+└─ Prepare for Phase 3
+
+
+PHASE 3: BUILD MANAGEMENT SYSTEM (3-4 weeks)
+├─ Create bevgenie-management repo
+├─ Implement admin authentication
+├─ Build KB management UI
+├─ Build prompt management UI
+├─ Build analytics dashboard
+└─ Connect to shared database
+
+
+PHASE 4: INTEGRATION & OPTIMIZATION (2 weeks)
+├─ End-to-end testing
+├─ Performance optimization
+├─ Monitoring setup
+└─ Production deployment
+
+
+TOTAL TIME: ~2 months to full alignment
+
+
+DECISION MATRIX
+═══════════════════════════════════════════════════════════════════════════════
+
+Your Decision:                          What to Do:
+─────────────────────────────────────────────────────────────────────────────
+
+"I need both products"          →  ✅ Start Phase 1 ASAP
+(Customer + Admin UI)               └─ Then Phase 2, 3, 4
+
+
+"I only need BevGenie now"      →  ✅ Still do Phase 1 (security)
+                                   ├─ Keep Phase 2-4 for later
+                                   └─ Add Product 2 when ready
+
+
+"I just need to get this        →  ✅ Do Phase 1 immediately
+ deployed quickly"                 └─ Most important for security
+
+
+"I want the cleanest code"      →  ✅ Do all 4 phases
+                                   └─ Best architecture
+
+
+"I'm unsure what to do"         →  📖 Read ALIGNMENT_QUICK_SUMMARY.md
+                                   └─ Then decide
+
+
+RISK ANALYSIS
+═══════════════════════════════════════════════════════════════════════════════
+
+WITHOUT Phase 1 (No Security):
+────────────────────────────────
+🔴 CRITICAL RISKS:
+   • BevGenie has full database access
+   • If compromised, attacker has full DB access
+   • No way to add Product 2 safely
+   • Cannot implement least-privilege access
+
+⏰ Impact Timeline:
+   • Immediate risk
+   • Grows with each new user/data
+   • Must fix before scaling
+
+
+WITH Phase 1 (Secured):
+──────────────────────
+✅ RISKS MITIGATED:
+   • BevGenie limited to analytics tables
+   • Compromise = limited damage
+   • Ready to add Product 2
+   • Professional security posture
+
+⏰ Impact Timeline:
+   • Complete protection in 1-2 weeks
+   • Safe to scale after that
+   • Ready for compliance requirements
+
+
+FILE STRUCTURE AFTER PHASE 1
+═══════════════════════════════════════════════════════════════════════════════
+
+BevGenie-Vercel/
+├─ lib/
+│  └─ supabase/
+│     ├─ clients.ts (bevgenieSupabaseClient)
+│     ├─ content-reader.ts (read-only)
+│     ├─ analytics-writer.ts (write-only)
+│     ├─ session-manager.ts (session management)
+│     └─ queries.ts (refactored)
+│
+├─ lib/ai/
+│  ├─ orchestrator.ts (uses abstraction)
+│  ├─ knowledge-search.ts (uses contentReader)
+│  └─ ... (all updated)
+│
+├─ app/api/
+│  └─ chat/
+│     └─ route.ts (uses limited key)
+│
+└─ .env.local
+   ├─ SUPABASE_URL=...
+   ├─ SUPABASE_BEVGENIE_KEY=... (NEW - limited)
+   └─ SUPABASE_ADMIN_KEY=... (stored securely)
+
+
+DATABASE SECURITY AFTER PHASE 1
+═══════════════════════════════════════════════════════════════════════════════
+
+Table                       BevGenie Access    Admin Access
+──────────────────────────────────────────────────────────────────────────────
+knowledge_documents         SELECT (published) SELECT, INSERT, UPDATE, DELETE
+prompt_templates            SELECT (active)    SELECT, INSERT, UPDATE, DELETE
+user_sessions               SELECT, INSERT     SELECT, INSERT, UPDATE, DELETE
+conversation_messages       SELECT, INSERT     SELECT, INSERT, UPDATE, DELETE
+knowledge_usage_analytics   SELECT, INSERT     SELECT, INSERT, UPDATE, DELETE
+user_personas               SELECT, INSERT     SELECT, INSERT, UPDATE, DELETE
+persona_signals             SELECT, INSERT     SELECT, INSERT, UPDATE, DELETE
+──────────────────────────────────────────────────────────────────────────────
+
+Legend:
+✅ SELECT = Can read
+✅ INSERT = Can add new rows
+✅ UPDATE = Can modify existing rows
+❌ DELETE = Cannot delete
+✅ (published) = Only published documents
+✅ (active) = Only active prompts
+
+
+QUICK START: WHAT TO DO NOW
+═══════════════════════════════════════════════════════════════════════════════
+
+Option A: IF YOU WANT FULL TWO-PRODUCT ARCHITECTURE
+─────────────────────────────────────────────────────
+1. Read: PHASE_1_IMPLEMENTATION_PLAN.md
+2. Start: RLS policy creation (Day 1-2)
+3. Continue: Follow timeline through Phase 4
+4. Result: Complete two-product system in 2 months
+
+Option B: IF YOU JUST NEED SECURITY HARDENING
+──────────────────────────────────────────────
+1. Read: PHASE_1_IMPLEMENTATION_PLAN.md
+2. Start: RLS policy creation
+3. Skip: Phases 2-4 (can do later)
+4. Result: Secured BevGenie in 1-2 weeks
+
+Option C: IF YOU'RE NOT SURE
+────────────────────────────
+1. Read: ALIGNMENT_QUICK_SUMMARY.md
+2. Read: ALIGNMENT_VISUAL_GUIDE.txt (this file)
+3. Decide: Based on your needs
+4. Execute: Start with Phase 1 (always recommended)
+
+
+SUMMARY
+═══════════════════════════════════════════════════════════════════════════════
+
+Current Status:    ⚠️ 60% Aligned (BevGenie good, security needs work)
+
+Main Problem:      🔴 BevGenie has full database access (security risk)
+
+Solution:          ✅ Implement RLS policies + service key separation
+
+Effort:            📅 1-2 weeks for Phase 1
+
+Next Step:         👉 Read PHASE_1_IMPLEMENTATION_PLAN.md and start today!
+
+Long-term Vision:  Complete two-product architecture in ~2 months
+
+
+RESOURCES
+═══════════════════════════════════════════════════════════════════════════════
+
+See these files for more details:
+
+Main Documents:
+├─ ALIGNMENT_QUICK_SUMMARY.md ..................... Quick reference
+├─ PHASE_1_IMPLEMENTATION_PLAN.md ................ Detailed guide
+├─ ARCHITECTURE_ALIGNMENT_ANALYSIS.md ........... Full assessment
+└─ This file (ALIGNMENT_VISUAL_GUIDE.txt) ....... Visual overview
+
+Supporting Documents:
+├─ CODE_ARCHITECTURE.md .......................... Code file breakdown
+├─ HOW_CONTENT_IS_GENERATED.md .................. 9-step pipeline
+├─ HOW_GENIE_PAGE_ACTUALLY_WORKS.md ............ Mock vs Real
+└─ two_product_arch.txt ......................... Original blueprint
+
+================================================================================

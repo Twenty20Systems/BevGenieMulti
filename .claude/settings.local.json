@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl:*)",
+      "Bash(git commit:*)",
+      "Read(//d/ClaudeProjects/ManagementSystem/**)",
+      "Bash(git remote add:*)",
+      "Bash(npx create-next-app:*)",
+      "mcp__supabase__apply_migration",
+      "Bash(npm install)",
+      "Bash(git add:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm ls:*)",
+      "mcp__supabase__get_project",
+      "mcp__supabase__search_docs",
+      "mcp__supabase__list_projects",
+      "mcp__supabase__execute_sql",
+      "Bash(npm run dev:*)",
+      "mcp__supabase__list_tables",
+      "Bash(pkill -9 node npm)",
+      "Bash(netstat:*)",
+      "Bash(for port in 3000 3001 3002 3003 3004 3005 3006 3007 3008 3009 3010)",
+      "Bash(do)",
+      "Bash(timeout 1 curl:*)",
+      "Bash(/dev/null)",
+      "Bash(echo:*)",
+      "Bash(break)",
+      "Bash(done)",
+      "Bash(cp:*)",
+      "Bash(PORT=3012 npm run dev:*)",
+      "Bash(awk:*)",
+      "Bash(xargs kill:*)",
+      "Bash(PORT=3013 npm run dev:*)",
+      "Bash(cat:*)",
+      "Bash(pkill:*)",
+      "Bash(taskkill:*)",
+      "Bash(npm install:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

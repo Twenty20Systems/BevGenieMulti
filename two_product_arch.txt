@@ -1,0 +1,624 @@
+# Two-Product Architecture
+
+## System Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     PRODUCT 1: BevGenie                             │
+│                  (Customer-Facing AI Chat)                          │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐            │
+│  │  Chat UI     │  │  Dynamic     │  │  Session     │            │
+│  │  Component   │→ │  Page        │  │  Management  │            │
+│  │              │  │  Renderer    │  │              │            │
+│  └──────────────┘  └──────────────┘  └──────────────┘            │
+│         ↓                  ↓                  ↓                    │
+│  ┌─────────────────────────────────────────────────────────────┐  │
+│  │              BevGenie API Layer                             │  │
+│  │  /api/chat         - Handle user messages                  │  │
+│  │  /api/session      - Session management                    │  │
+│  │  /api/feedback     - User feedback                         │  │
+│  └─────────────────────────────────────────────────────────────┘  │
+│         ↓                                                          │
+│  ┌─────────────────────────────────────────────────────────────┐  │
+│  │              Core Services                                  │  │
+│  │  - Orchestrator (your existing flow)                        │  │
+│  │  - Persona Detection                                        │  │
+│  │  - Intent Classification                                    │  │
+│  │  - Page Generation                                          │  │
+│  └─────────────────────────────────────────────────────────────┘  │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+                              ↓ ↑
+                    ┌──────────────────────┐
+                    │   SHARED DATA API    │
+                    │   (Read-Only from    │
+                    │    BevGenie side)    │
+                    └──────────────────────┘
+                              ↓ ↑
+┌─────────────────────────────────────────────────────────────────────┐
+│              PRODUCT 2: Management System                           │
+│           (Internal Admin & Content Management)                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │                   Admin Dashboard                            │  │
+│  │                                                              │  │
+│  │  ┌───────────────┐  ┌───────────────┐  ┌────────────────┐  │  │
+│  │  │  Knowledge    │  │   Prompt      │  │   Analytics    │  │  │
+│  │  │  Base         │  │   Management  │  │   Dashboard    │  │  │
+│  │  │  Management   │  │               │  │                │  │  │
+│  │  │               │  │               │  │                │  │  │
+│  │  │ • Upload docs │  │ • Edit prompts│  │ • Usage stats  │  │  │
+│  │  │ • Approve     │  │ • A/B testing │  │ • Persona dist │  │  │
+│  │  │ • Tag/catalog │  │ • NL improve  │  │ • Cost tracking│  │  │
+│  │  │ • Quality     │  │ • Versioning  │  │ • KB analytics │  │  │
+│  │  └───────────────┘  └───────────────┘  └────────────────┘  │  │
+│  │                                                              │  │
+│  │  ┌───────────────┐  ┌───────────────┐  ┌────────────────┐  │  │
+│  │  │  Quality      │  │   User        │  │   System       │  │  │
+│  │  │  Assurance    │  │   Management  │  │   Settings     │  │  │
+│  │  │               │  │               │  │                │  │  │
+│  │  │ • Review queue│  │ • Admin users │  │ • API configs  │  │  │
+│  │  │ • Manual QA   │  │ • Permissions │  │ • Rate limits  │  │  │
+│  │  │ • Flagged     │  │ • Audit logs  │  │ • Feature flags│  │  │
+│  │  └───────────────┘  └───────────────┘  └────────────────┘  │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+│                              ↓                                      │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │          Management System API Layer                         │  │
+│  │  /api/kb/*           - Knowledge base CRUD                   │  │
+│  │  /api/prompts/*      - Prompt management                     │  │
+│  │  /api/analytics/*    - Analytics & reporting                 │  │
+│  │  /api/quality/*      - QA operations                         │  │
+│  │  /api/users/*        - User management                       │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+│                              ↓                                      │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │          Management Services                                 │  │
+│  │  - Knowledge Base Manager                                    │  │
+│  │  - Prompt Manager                                            │  │
+│  │  - Analytics Engine                                          │  │
+│  │  - Quality Assurance System                                  │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+                              ↓ ↑
+┌─────────────────────────────────────────────────────────────────────┐
+│                      SHARED DATA LAYER                              │
+│                    (Supabase PostgreSQL)                            │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │  Content Tables (Managed by Management System)               │  │
+│  │  ├─ knowledge_documents (read by BevGenie)                   │  │
+│  │  ├─ prompt_templates (read by BevGenie)                      │  │
+│  │  ├─ admin_users (Management System only)                     │  │
+│  │  └─ system_settings (read by BevGenie)                       │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+│                                                                     │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │  Runtime Tables (Written by BevGenie)                        │  │
+│  │  ├─ sessions (BevGenie writes, Management reads)             │  │
+│  │  ├─ conversation_messages (BevGenie writes, Management reads)│  │
+│  │  ├─ persona_signals (BevGenie writes, Management reads)      │  │
+│  │  ├─ knowledge_usage_analytics (BevGenie writes)              │  │
+│  │  ├─ prompt_performance_metrics (BevGenie writes)             │  │
+│  │  ├─ user_feedback (BevGenie writes, Management reads)        │  │
+│  │  └─ api_requests (BevGenie writes, Management reads)         │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+│                                                                     │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │  Shared Tables (Both systems read/write)                     │  │
+│  │  ├─ cost_tracking (both write, Management aggregates)        │  │
+│  │  └─ audit_logs (both write)                                  │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+## Product Separation Details
+
+### Product 1: BevGenie (Customer-Facing)
+
+**Purpose:** Conversational AI interface for beverage industry professionals
+
+**Tech Stack:**
+```
+- Framework: Next.js 14 (App Router)
+- Hosting: Vercel
+- Database Access: Supabase (Read-only for content, Write for analytics)
+- LLMs: OpenAI (GPT-4o) + Anthropic (Claude)
+- Caching: Upstash Redis
+```
+
+**Responsibilities:**
+- ✅ Handle user chat interactions
+- ✅ Detect persona and signals
+- ✅ Search knowledge base (read-only)
+- ✅ Fetch active prompts (read-only)
+- ✅ Generate responses
+- ✅ Create dynamic pages
+- ✅ Track usage analytics
+- ✅ Collect user feedback
+
+**Does NOT:**
+- ❌ Manage knowledge base content
+- ❌ Edit prompts
+- ❌ View aggregated analytics
+- ❌ Manage users
+- ❌ Configure system settings
+
+**Key Files:**
+```
+bevgenie/
+├── app/
+│   ├── page.tsx (Landing page)
+│   ├── chat/
+│   │   └── page.tsx (Chat interface)
+│   └── api/
+│       ├── chat/route.ts
+│       ├── session/route.ts
+│       └── feedback/route.ts
+├── components/
+│   ├── genie/
+│   │   ├── chat-bubble.tsx
+│   │   ├── loading-screen.tsx
+│   │   └── dynamic-page-renderer.tsx
+│   └── ui/
+├── lib/
+│   ├── orchestrator.ts (your existing flow)
+│   ├── persona-detection.ts
+│   ├── knowledge-search.ts (READ operations only)
+│   ├── prompt-fetcher.ts (READ operations only)
+│   ├── page-generator.ts
+│   └── supabase-client.ts
+└── package.json
+```
+
+---
+
+### Product 2: Management System (Internal Admin)
+
+**Purpose:** Content management, prompt engineering, and analytics dashboard
+
+**Tech Stack:**
+```
+- Framework: Next.js 14 (App Router) - separate repo
+- Hosting: Vercel (separate project)
+- Database Access: Supabase (Full Read/Write)
+- LLMs: Anthropic Claude (for prompt improvements)
+- Auth: Supabase Auth + RBAC
+```
+
+**Responsibilities:**
+- ✅ Upload and manage knowledge base documents
+- ✅ Create and version prompts
+- ✅ A/B test prompts
+- ✅ Natural language prompt improvements
+- ✅ View analytics dashboards
+- ✅ Quality assurance reviews
+- ✅ User management
+- ✅ Cost tracking and reporting
+- ✅ System configuration
+
+**Does NOT:**
+- ❌ Handle customer chat interactions
+- ❌ Generate pages for end users
+- ❌ Detect personas
+
+**Key Files:**
+```
+management-system/
+├── app/
+│   ├── layout.tsx (Admin auth wrapper)
+│   ├── page.tsx (Dashboard home)
+│   ├── knowledge/
+│   │   ├── page.tsx (Document list)
+│   │   ├── upload/page.tsx
+│   │   └── [id]/page.tsx
+│   ├── prompts/
+│   │   ├── page.tsx (Prompt list)
+│   │   ├── create/page.tsx
+│   │   ├── [id]/edit/page.tsx
+│   │   └── [id]/improve/page.tsx
+│   ├── analytics/
+│   │   ├── page.tsx (Overview)
+│   │   ├── personas/page.tsx
+│   │   ├── knowledge/page.tsx
+│   │   └── costs/page.tsx
+│   ├── quality/
+│   │   └── page.tsx (QA Console)
+│   └── api/
+│       ├── kb/
+│       │   ├── upload/route.ts
+│       │   ├── approve/route.ts
+│       │   └── [id]/route.ts
+│       ├── prompts/
+│       │   ├── create/route.ts
+│       │   ├── improve/route.ts
+│       │   └── ab-test/route.ts
+│       └── analytics/
+│           ├── overview/route.ts
+│           └── export/route.ts
+├── components/
+│   ├── admin/
+│   │   ├── sidebar.tsx
+│   │   ├── header.tsx
+│   │   └── auth-wrapper.tsx
+│   ├── kb/
+│   │   ├── document-uploader.tsx
+│   │   ├── document-list.tsx
+│   │   └── quality-validator.tsx
+│   └── prompts/
+│       ├── prompt-editor.tsx
+│       ├── nl-improver.tsx
+│       └── ab-test-manager.tsx
+├── lib/
+│   ├── knowledge-base-manager.ts (FULL CRUD)
+│   ├── prompt-manager.ts (FULL CRUD)
+│   ├── analytics-engine.ts
+│   └── supabase-admin.ts (elevated permissions)
+└── package.json
+```
+
+---
+
+## Integration Architecture
+
+### 1. Data Access Patterns
+
+```typescript
+// BevGenie - READ ONLY access to content
+// lib/content-reader.ts (in BevGenie)
+export class ContentReader {
+  private supabase;
+  
+  constructor() {
+    // Use service role key with RLS policies that allow read-only
+    this.supabase = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_KEY!
+    );
+  }
+  
+  async getPublishedDocuments(query: string, persona: string) {
+    // Can only read published documents
+    const { data } = await this.supabase
+      .from('knowledge_documents')
+      .select('*')
+      .eq('status', 'published')
+      .rpc('match_documents', { query_embedding: embedding });
+    
+    return data;
+  }
+  
+  async getActivePrompt(personaType: string, sessionId: string) {
+    // Can only read active prompts
+    const { data } = await this.supabase
+      .from('prompt_templates')
+      .select('*')
+      .eq('status', 'active')
+      .eq('persona_type', personaType);
+    
+    return data?.[0];
+  }
+}
+
+// Management System - FULL CRUD access
+// lib/content-manager.ts (in Management System)
+export class ContentManager {
+  private supabase;
+  
+  constructor() {
+    // Full access with admin service key
+    this.supabase = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_ADMIN_KEY! // Different key with full permissions
+    );
+  }
+  
+  async createDocument(doc: any) {
+    // Can create in any status
+    return await this.supabase
+      .from('knowledge_documents')
+      .insert(doc);
+  }
+  
+  async updateDocument(id: string, updates: any) {
+    // Can update any field
+    return await this.supabase
+      .from('knowledge_documents')
+      .update(updates)
+      .eq('id', id);
+  }
+  
+  async deleteDocument(id: string) {
+    // Can delete
+    return await this.supabase
+      .from('knowledge_documents')
+      .delete()
+      .eq('id', id);
+  }
+}
+```
+
+### 2. Row-Level Security (RLS) Policies
+
+```sql
+-- BevGenie can only read published content
+CREATE POLICY "bevgenie_read_published" ON knowledge_documents
+    FOR SELECT
+    TO bevgenie_role
+    USING (status = 'published');
+
+CREATE POLICY "bevgenie_read_active_prompts" ON prompt_templates
+    FOR SELECT
+    TO bevgenie_role
+    USING (status = 'active');
+
+-- BevGenie can write analytics
+CREATE POLICY "bevgenie_write_analytics" ON knowledge_usage_analytics
+    FOR INSERT
+    TO bevgenie_role
+    WITH CHECK (true);
+
+CREATE POLICY "bevgenie_write_sessions" ON sessions
+    FOR ALL
+    TO bevgenie_role
+    USING (true)
+    WITH CHECK (true);
+
+-- Management System has full access to everything
+CREATE POLICY "admin_full_access" ON knowledge_documents
+    FOR ALL
+    TO admin_role
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "admin_full_prompts" ON prompt_templates
+    FOR ALL
+    TO admin_role
+    USING (true)
+    WITH CHECK (true);
+```
+
+### 3. Environment Variables Separation
+
+**BevGenie (.env):**
+```env
+# Database (read-optimized)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_KEY=bevgenie_service_role_key
+SUPABASE_ANON_KEY=your_anon_key
+
+# LLMs
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Caching
+UPSTASH_REDIS_URL=https://...
+UPSTASH_REDIS_TOKEN=...
+
+# Monitoring
+SENTRY_DSN=https://...
+```
+
+**Management System (.env):**
+```env
+# Database (full admin access)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ADMIN_KEY=admin_service_role_key
+SUPABASE_ANON_KEY=your_anon_key
+
+# LLMs (only Claude for prompt improvements)
+ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-... (for embeddings)
+
+# Auth
+NEXTAUTH_URL=https://admin.bevgenie.com
+NEXTAUTH_SECRET=...
+
+# Monitoring
+SENTRY_DSN=https://...
+```
+
+---
+
+## Communication Between Products
+
+### Option 1: Shared Database (Recommended)
+
+**Pros:**
+- ✅ Real-time updates (no sync lag)
+- ✅ Single source of truth
+- ✅ Simpler architecture
+- ✅ Lower operational complexity
+
+**Cons:**
+- ⚠️ Need careful RLS policies
+- ⚠️ Both products need database access
+
+```
+┌─────────────┐         ┌──────────────────┐         ┌──────────────┐
+│  BevGenie   │────────►│  Supabase DB     │◄────────│ Management   │
+│  (Read Only)│         │  (Single Source) │  (R/W)  │   System     │
+└─────────────┘         └──────────────────┘         └──────────────┘
+                                 │
+                        [RLS Policies enforce
+                         access boundaries]
+```
+
+### Option 2: API-Based Communication
+
+**Pros:**
+- ✅ Complete separation
+- ✅ Can deploy independently
+- ✅ Can use different databases
+
+**Cons:**
+- ⚠️ More complex
+- ⚠️ Latency for content updates
+- ⚠️ Need API versioning
+
+```
+┌─────────────┐         ┌──────────────────┐         ┌──────────────┐
+│  BevGenie   │────────►│  Management API  │◄────────│ Management   │
+│             │  REST   │  /api/content/*  │   UI    │   System     │
+└─────────────┘         └──────────────────┘         └──────────────┘
+                                 │
+                        ┌────────────────┐
+                        │  Management DB │
+                        └────────────────┘
+```
+
+### Recommendation: Shared Database with RLS
+
+For your use case, **Option 1 (Shared Database)** is better because:
+1. Content updates are immediately available to BevGenie
+2. Analytics flow naturally from BevGenie to Management System
+3. Simpler to maintain
+4. Lower latency
+
+---
+
+## Deployment Strategy
+
+### BevGenie Deployment
+
+```yaml
+# vercel.json (BevGenie project)
+{
+  "name": "bevgenie",
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next"
+    }
+  ],
+  "env": {
+    "SUPABASE_URL": "@supabase-url",
+    "SUPABASE_SERVICE_KEY": "@bevgenie-service-key",
+    "OPENAI_API_KEY": "@openai-key",
+    "ANTHROPIC_API_KEY": "@anthropic-key"
+  }
+}
+```
+
+**Domain:** `https://bevgenie.ai` or `https://app.bevgenie.com`
+
+### Management System Deployment
+
+```yaml
+# vercel.json (Management System project)
+{
+  "name": "bevgenie-management",
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next"
+    }
+  ],
+  "env": {
+    "SUPABASE_URL": "@supabase-url",
+    "SUPABASE_ADMIN_KEY": "@admin-service-key",
+    "ANTHROPIC_API_KEY": "@anthropic-key"
+  }
+}
+```
+
+**Domain:** `https://admin.bevgenie.com` or `https://manage.bevgenie.com`
+
+---
+
+## Repository Structure
+
+### Two Separate Repositories
+
+```
+bevgenie/                          (Customer product)
+├── .git/
+├── .env.local
+├── app/
+├── components/
+├── lib/
+├── public/
+├── package.json
+└── vercel.json
+
+bevgenie-management/               (Admin product)
+├── .git/
+├── .env.local
+├── app/
+├── components/
+├── lib/
+├── public/
+├── package.json
+└── vercel.json
+```
+
+### Shared Code (Optional)
+
+If you want to share some code:
+
+```
+@bevgenie/shared/                  (NPM package)
+├── src/
+│   ├── types/
+│   │   ├── knowledge.ts
+│   │   ├── prompt.ts
+│   │   └── persona.ts
+│   └── utils/
+│       ├── embedding.ts
+│       └── validation.ts
+└── package.json
+
+# Install in both projects
+npm install @bevgenie/shared
+```
+
+---
+
+## What to Build First
+
+### Phase 1: Management System MVP (2-3 weeks)
+1. ✅ Admin authentication
+2. ✅ Knowledge base upload UI
+3. ✅ Document approval workflow
+4. ✅ Basic analytics dashboard
+5. ✅ Prompt viewing/editing
+
+### Phase 2: Integrate with BevGenie (1 week)
+1. ✅ BevGenie reads from published KB
+2. ✅ BevGenie tracks usage analytics
+3. ✅ Test end-to-end flow
+
+### Phase 3: Advanced Features (2-3 weeks)
+1. ✅ Prompt A/B testing
+2. ✅ Natural language prompt improvement
+3. ✅ Quality assurance console
+4. ✅ Cost tracking dashboard
+
+---
+
+## Summary
+
+| Aspect | BevGenie | Management System |
+|--------|----------|-------------------|
+| **Users** | Customers | Internal admins |
+| **Purpose** | AI chat interface | Content & analytics management |
+| **Database Access** | Read-only (content), Write (analytics) | Full Read/Write |
+| **Deployment** | app.bevgenie.com | admin.bevgenie.com |
+| **Authentication** | Optional/session-based | Required/role-based |
+| **Repository** | bevgenie/ | bevgenie-management/ |
+| **Primary LLM** | OpenAI GPT-4o | Anthropic Claude |
+
+This architecture gives you:
+✅ Clear separation of concerns
+✅ Independent deployment
+✅ Different security boundaries
+✅ Scalable for future features
+✅ Easy to maintain
