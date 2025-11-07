@@ -386,6 +386,7 @@ export default function HomePage() {
                 specification={page.content}
                 onBackToHome={handleBackToHome}
                 onNavigationClick={handleNavigationClick}
+                onProfileClick={() => setIsProfileOpen(true)}
               />
             </section>
           ))}

@@ -5,6 +5,7 @@ import { BevGeniePage, PageSection, sanitizePageContent } from '@/lib/ai/page-sp
 import { COLORS } from '@/lib/constants/colors';
 import { Download, Share2, ExternalLink, ArrowRight, Target, BarChart3, TrendingUp, Zap, Users, Map as MapIcon, Award, Shield } from 'lucide-react';
 import { SingleScreenSection } from '@/components/genie/single-screen-section';
+import { Navigation } from '@/components/navigation';
 import { Footer } from '@/components/footer';
 import { DemoForm } from '@/components/genie/demo-form';
 
@@ -84,6 +85,7 @@ interface DynamicPageRendererProps {
   onNavigationClick?: (action: string, context?: any) => void;
   compact?: boolean; // For displaying in chat vs full page
   onBackToHome?: () => void;
+  onProfileClick?: () => void;
 }
 
 /**
@@ -100,6 +102,7 @@ export function DynamicPageRenderer({
   onNavigationClick,
   compact = false,
   onBackToHome,
+  onProfileClick,
 }: DynamicPageRendererProps) {
   // 🚨 DEBUG: Log received page data
   console.log('🎨 [Renderer] Received page:', {
@@ -125,12 +128,18 @@ export function DynamicPageRenderer({
 
   return (
     <div className="h-full w-full flex flex-col overflow-hidden bg-[#0A1628]">
-      {/* Content - fills available space with grid layout */}
+      {/* Full Navigation Bar - Fixed at top with logo, About Us, Profile */}
+      <div className="flex-shrink-0">
+        <Navigation onProfileClick={onProfileClick} />
+      </div>
+
+      {/* Content - fills available space with grid layout (accounting for nav height) */}
       <div
         className="flex-1 overflow-hidden"
         style={{
           display: 'grid',
           gridTemplateRows,
+          marginTop: '64px', // Account for fixed navigation height
         }}
       >
         {/* Render sections in grid cells */}

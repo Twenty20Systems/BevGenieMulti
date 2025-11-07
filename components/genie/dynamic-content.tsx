@@ -8,6 +8,7 @@ interface DynamicContentProps {
   specification: BevGeniePage;
   onNavigationClick?: (action: string, context?: any) => void;
   onBackToHome?: () => void;
+  onProfileClick?: () => void;
 }
 
 /**
@@ -23,7 +24,8 @@ interface DynamicContentProps {
 export function DynamicContent({
   specification,
   onNavigationClick,
-  onBackToHome
+  onBackToHome,
+  onProfileClick
 }: DynamicContentProps) {
   return (
     <div className="h-full w-full overflow-hidden">
@@ -32,6 +34,7 @@ export function DynamicContent({
         page={specification}
         onNavigationClick={onNavigationClick}
         onBackToHome={onBackToHome}
+        onProfileClick={onProfileClick}
       />
     </div>
   );
