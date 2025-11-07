@@ -26,11 +26,12 @@ export function DynamicContent({
   onBackToHome
 }: DynamicContentProps) {
   return (
-    <div className="h-full overflow-y-auto bg-white">
-      {/* Page Content */}
+    <div className="h-full w-full overflow-hidden">
+      {/* Page Content - fills parent h-screen container */}
       <DynamicPageRenderer
         page={specification}
         onNavigationClick={onNavigationClick}
+        onBackToHome={onBackToHome}
       />
     </div>
   );
