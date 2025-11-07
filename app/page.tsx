@@ -359,7 +359,7 @@ export default function HomePage() {
       {/* Landing Page - Show when no pages generated - Full scrollable page */}
       {showFullLandingPage && (
         <main className="min-h-screen">
-          <Navigation onProfileClick={() => setIsProfileOpen(true)} />
+          <Navigation onProfileClick={() => setIsProfileOpen(true)} onHomeClick={handleBackToHome} />
           <Hero onCtaClick={(text) => handleSendMessage(`I want to ${text}`, { source: 'hero-cta', text })} />
           <Challenges onCardClick={(title, description) => handleSendMessage(`Tell me more about ${title}: ${description}`, { source: 'challenges-card', title, description })} />
           <DataPowered />

@@ -9,9 +9,10 @@ import { useAuth } from "@/contexts/auth-context"
 
 interface NavigationProps {
   onProfileClick?: () => void;
+  onHomeClick?: () => void;
 }
 
-export function Navigation({ onProfileClick }: NavigationProps = {}) {
+export function Navigation({ onProfileClick, onHomeClick }: NavigationProps = {}) {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const { user, loading, signOut } = useAuth()
@@ -51,6 +52,12 @@ export function Navigation({ onProfileClick }: NavigationProps = {}) {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-4 lg:gap-6 flex-shrink-0">
+            <button
+              onClick={onHomeClick}
+              className="text-[#FFFFFF] hover:text-[#00C8FF] transition-colors font-medium whitespace-nowrap"
+            >
+              Home
+            </button>
             <Link href="/about" className="text-[#FFFFFF] hover:text-[#00C8FF] transition-colors font-medium whitespace-nowrap">
               About Us
             </Link>
@@ -115,6 +122,15 @@ export function Navigation({ onProfileClick }: NavigationProps = {}) {
         {isMobileMenuOpen && (
           <div className="md:hidden py-4 border-t border-[#00C8FF]/20">
             <div className="flex flex-col gap-4">
+              <button
+                onClick={() => {
+                  onHomeClick?.();
+                  setIsMobileMenuOpen(false);
+                }}
+                className="text-[#FFFFFF] hover:text-[#00C8FF] transition-colors font-medium py-2 text-left"
+              >
+                Home
+              </button>
               <Link
                 href="/about"
                 className="text-[#FFFFFF] hover:text-[#00C8FF] transition-colors font-medium py-2"

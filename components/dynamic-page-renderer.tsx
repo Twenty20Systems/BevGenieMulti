@@ -129,7 +129,7 @@ export function DynamicPageRenderer({
   return (
     <div className="h-full w-full flex flex-col overflow-hidden bg-[#0A1628]">
       {/* Full Navigation Bar - Fixed at top with logo, About Us, Profile */}
-      <Navigation onProfileClick={onProfileClick} />
+      <Navigation onProfileClick={onProfileClick} onHomeClick={onBackToHome} />
 
       {/* Content wrapper - accounts for fixed nav (64px) and uses remaining space */}
       <div
