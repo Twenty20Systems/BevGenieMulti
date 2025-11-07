@@ -59,8 +59,8 @@ export default function HomePage() {
   // Ref for scrolling to newly generated pages
   const lastPageRef = useRef<HTMLDivElement>(null);
 
-  // Show landing page only when no pages generated yet (even during generation)
-  const showLandingPage = pageHistory.length === 0;
+  // Always show full landing page on initial load
+  const showFullLandingPage = pageHistory.length === 0;
 
   // Initialize session tracker
   useEffect(() => {
@@ -356,44 +356,40 @@ export default function HomePage() {
         />
       )}
 
-      {/* Landing Page - Show when no pages generated - SINGLE SCREEN */}
-      {showLandingPage && (
-        <main className="h-screen overflow-hidden snap-start">
+      {/* Full Landing Page - Always show with all sections */}
+      {showFullLandingPage && (
+        <main className="min-h-screen">
           <Navigation onProfileClick={() => setIsProfileOpen(true)} />
           <Hero onCtaClick={(text) => handleSendMessage(`I want to ${text}`, { source: 'hero-cta', text })} />
+          <Challenges onCardClick={(title, description) => handleSendMessage(`Tell me more about ${title}: ${description}`, { source: 'challenges-card', title, description })} />
+          <DataPowered />
+          <Solutions
+            onCardClick={(title) => handleSendMessage(`Show me solutions for ${title}`, { source: 'solutions-card', category: title })}
+            onQuestionClick={(question, category) => handleSendMessage(question, { source: 'solutions-question', question, category })}
+          />
+          <Footer />
         </main>
       )}
 
-      {/* Generated Pages Stack - Vertical Scrolling with Snap Points */}
+      {/* Generated Pages Stack - Show below landing page */}
       {pageHistory.length > 0 && (
-        <>
-          {/* Show homepage first when there are generated pages */}
-          {!showLandingPage && (
-            <div className="h-screen overflow-hidden snap-start">
-              <Navigation onProfileClick={() => setIsProfileOpen(true)} />
-              <Hero onCtaClick={(text) => handleSendMessage(`I want to ${text}`, { source: 'hero-cta', text })} />
-            </div>
-          )}
-
-          {/* Generated pages */}
-          <div id="generated-pages-stack">
-            {pageHistory.map((page, index) => (
-              <section
-                key={page.id}
-                id={page.id}
-                ref={index === pageHistory.length - 1 ? lastPageRef : null}
-                className="snap-start h-screen overflow-hidden"
-                data-page-index={index}
-              >
-                <DynamicContent
-                  specification={page.content}
-                  onBackToHome={handleBackToHome}
-                  onNavigationClick={handleNavigationClick}
-                />
-              </section>
-            ))}
-          </div>
-        </>
+        <div id="generated-pages-stack">
+          {pageHistory.map((page, index) => (
+            <section
+              key={page.id}
+              id={page.id}
+              ref={index === pageHistory.length - 1 ? lastPageRef : null}
+              className="min-h-screen"
+              data-page-index={index}
+            >
+              <DynamicContent
+                specification={page.content}
+                onBackToHome={handleBackToHome}
+                onNavigationClick={handleNavigationClick}
+              />
+            </section>
+          ))}
+        </div>
       )}
 
       {/* Chat Bubble (Always visible) - Passes message history */}
