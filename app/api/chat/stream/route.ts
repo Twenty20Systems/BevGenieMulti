@@ -299,6 +299,7 @@ async function processStreamWithController(
           personaDescription: 'User profile',
           pageContext: pageContext,
           interactionSource: interactionSource,
+          sessionId: session.user.sessionId, // Track content to prevent repetition
         })
       ]);
 
