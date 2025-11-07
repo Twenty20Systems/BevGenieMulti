@@ -379,7 +379,7 @@ export default function HomePage() {
               key={page.id}
               id={page.id}
               ref={index === pageHistory.length - 1 ? lastPageRef : null}
-              className="min-h-screen"
+              className="h-screen overflow-hidden"
               data-page-index={index}
             >
               <DynamicContent

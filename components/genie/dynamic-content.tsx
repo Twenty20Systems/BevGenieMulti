@@ -26,7 +26,7 @@ export function DynamicContent({
   onBackToHome
 }: DynamicContentProps) {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="h-full overflow-y-auto bg-white">
       {/* Page Content */}
       <DynamicPageRenderer
         page={specification}
