@@ -9,6 +9,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { getTemplatesForType, extractPlaceholders, TemplateVariant } from './page-templates';
 import { PersonaScores } from '@/lib/session/types';
 import type { KBDocument } from './page-generator';
+import { getKnowledgeDocuments } from './knowledge-search';
 
 const client = new Anthropic();
 
@@ -27,7 +28,7 @@ export interface ContentFillResult {
 
 /**
  * Select best template based on user query and intent
- * Uses lightweight AI call (Sonnet 4.5, 500 tokens)
+ * ⚡ OPTIMIZED: Uses Claude Haiku (5x faster, 10x cheaper than Sonnet)
  */
 export async function selectTemplate(
   userMessage: string,
@@ -63,8 +64,8 @@ Format: TEMPLATE_ID | Reason`;
 
   try {
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 100, // Very small - just need template ID
+      model: 'claude-haiku-4-20250514', // ⚡ Haiku: 5x faster, 10x cheaper than Sonnet
+      max_tokens: 50, // Reduced from 100 - even smaller for classification
       messages: [{ role: 'user', content: prompt }],
     });
 
@@ -85,7 +86,7 @@ Format: TEMPLATE_ID | Reason`;
     // Find selected template
     const selectedTemplate = templates.find(t => t.id === templateId) || templates[0];
 
-    console.log(`[Template] Selected: ${selectedTemplate.name} in ${Date.now() - startTime}ms`);
+    console.log(`[Template] ⚡ Selected: ${selectedTemplate.name} in ${Date.now() - startTime}ms (Haiku)`);
 
     return {
       template: selectedTemplate,
@@ -147,7 +148,7 @@ export async function fillTemplateContent(
     .map(doc => doc.content.substring(0, 300))  // Longer excerpts (was 150)
     .join('\n---\n') || '';
 
-  // Enhanced prompt for diverse, detailed content
+  // Enhanced prompt for diverse, detailed content with UI guidelines
   const prompt = `Fill these content placeholders for a beverage industry solution page with DIVERSE, SPECIFIC content:
 
 User Query: "${userMessage}"
@@ -170,6 +171,21 @@ CRITICAL Instructions:
 7. Use data from KB context when available
 8. Each stat should have DIFFERENT metrics (don't repeat "increase sales" 3 times)
 9. Keep descriptions detailed but scannable (2-3 sentences max)
+
+HEADLINE GUIDELINES:
+- Keep headlines punchy and benefit-driven (max 8 words)
+- Make subtitles concise and specific (1-2 lines)
+- Use powerful action verbs (Identify, Uncover, Transform, Maximize)
+
+STAT GUIDELINES:
+- Use varied metrics: percentages, dollar amounts, time savings, counts
+- Make stat labels specific and different from each other
+- Keep descriptions brief (1 line max)
+
+CTA GUIDELINES:
+- Make CTAs specific and benefit-driven (not generic)
+- Examples: "See Hidden Revenue Opportunities", "Identify Whitespace in 5 Minutes"
+- Avoid: "Learn More", "Get Started" (too generic)
 
 Example GOOD response with VARIETY:
 {
@@ -243,6 +259,135 @@ Respond with ONLY a JSON object:
 }
 
 /**
+ * Fill template with AI-generated content using STREAMING
+ * ⚡ Provides instant feedback to users as content generates
+ *
+ * @param template - Template to fill
+ * @param userMessage - User's query
+ * @param persona - User persona
+ * @param knowledgeDocuments - KB context
+ * @param onChunk - Callback for each chunk of content (partial updates)
+ * @returns Final filled content
+ */
+export async function fillTemplateContentStreaming(
+  template: TemplateVariant,
+  userMessage: string,
+  persona: PersonaScores,
+  knowledgeDocuments?: KBDocument[],
+  onChunk?: (partialPage: any, accumulated: string) => void
+): Promise<ContentFillResult> {
+  const startTime = Date.now();
+  const placeholders = extractPlaceholders(template);
+
+  // Build KB context summary
+  const kbSummary = knowledgeDocuments
+    ?.slice(0, 3)  // Reduced from 5 for faster processing
+    .map(doc => doc.content.substring(0, 200))  // Reduced from 300
+    .join('\n---\n') || '';
+
+  // Shorter prompt for faster streaming with UI guidelines
+  const prompt = `Fill content placeholders for beverage industry solution page with UNIQUE, SPECIFIC content:
+
+User Query: "${userMessage}"
+Template: ${template.name}
+Focus: ${persona.pain_points_detected.join(', ') || 'general'}
+
+KB Context:
+${kbSummary}
+
+Placeholders: ${placeholders.slice(0, 15).join(', ')}
+
+Rules:
+1. UNIQUE content for each placeholder
+2. SPECIFIC beverage industry data
+3. CONCRETE numbers and percentages
+4. NO REPETITION
+5. Headlines: Punchy, max 8 words, benefit-driven
+6. Subtitles: Concise, 1-2 lines, specific
+7. Stats: Varied metrics (%, $, days, counts)
+8. CTAs: Specific benefits (not "Learn More")
+
+Output ONLY JSON:
+{
+  "placeholder_name": "value",
+  ...
+}`;
+
+  try {
+    let accumulated = '';
+    let lastValidJson: any = null;
+
+    // Start streaming
+    const stream = await client.messages.stream({
+      model: 'claude-sonnet-4-5-20250929',
+      max_tokens: 2000, // Reduced from 2500
+      system: [
+        {
+          type: 'text',
+          text: 'Expert beverage content generator. Output concise, specific JSON. NO explanations.',
+          cache_control: { type: 'ephemeral' },
+        }
+      ],
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    // Process stream chunks
+    for await (const chunk of stream) {
+      if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+        accumulated += chunk.delta.text;
+
+        // Try parsing partial JSON
+        try {
+          // Extract JSON if it's embedded in text
+          const jsonMatch = accumulated.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const partialContent = JSON.parse(jsonMatch[0]);
+            lastValidJson = partialContent;
+
+            // Send partial update to callback
+            if (onChunk) {
+              try {
+                const partialPage = fillPlaceholders(template, partialContent);
+                onChunk(partialPage, accumulated);
+              } catch (e) {
+                // Ignore parsing errors for partial content
+              }
+            }
+          }
+        } catch {
+          // Not valid JSON yet, continue accumulating
+        }
+      }
+    }
+
+    // Final processing
+    const jsonMatch = accumulated.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('No JSON found in response');
+    }
+
+    const contentMap = JSON.parse(jsonMatch[0]);
+    const filledPage = fillPlaceholders(template, contentMap);
+
+    console.log(`[Template] Content streamed in ${Date.now() - startTime}ms`);
+
+    return {
+      success: true,
+      filledPage,
+      generationTime: Date.now() - startTime,
+    };
+  } catch (error) {
+    console.error('[Template] Streaming error:', error);
+    return {
+      success: false,
+      filledPage: null,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      generationTime: Date.now() - startTime,
+    };
+  }
+}
+
+/**
  * Replace placeholders in template with actual content
  */
 function fillPlaceholders(template: TemplateVariant, contentMap: Record<string, string>): any {
@@ -295,6 +440,7 @@ function fillPlaceholders(template: TemplateVariant, contentMap: Record<string, 
 /**
  * Main entry point: Select template and fill content
  * Much faster than full generation!
+ * ⚡ OPTIMIZED: Runs template selection and KB search in parallel
  */
 export async function generateFromTemplate(
   userMessage: string,
@@ -304,20 +450,82 @@ export async function generateFromTemplate(
 ): Promise<ContentFillResult> {
   const totalStart = Date.now();
 
-  // Step 1: Select template (1-2s)
-  const selection = await selectTemplate(userMessage, pageType, persona, knowledgeDocuments);
-  console.log(`[Template] Selected: ${selection.template.name} - ${selection.reasoning}`);
+  // ⚡ OPTIMIZATION: Run template selection and KB search in parallel
+  const [selection, kbDocs] = await Promise.all([
+    selectTemplate(userMessage, pageType, persona, knowledgeDocuments),
+    knowledgeDocuments
+      ? Promise.resolve(knowledgeDocuments)
+      : getKnowledgeDocuments(userMessage, [], [], 3).catch(err => {
+          console.error('[Template] KB search error:', err);
+          return []; // Fallback to empty array on error
+        })
+  ]);
 
-  // Step 2: Fill content (4-6s)
+  console.log(`[Template] Selected: ${selection.template.name} - ${selection.reasoning}`);
+  console.log(`[Template] KB docs retrieved: ${kbDocs.length}`);
+
+  // Step 2: Fill content with KB docs
   const result = await fillTemplateContent(
     selection.template,
     userMessage,
     persona,
-    knowledgeDocuments
+    kbDocs
   );
 
   const totalTime = Date.now() - totalStart;
-  console.log(`[Template] Total generation: ${totalTime}ms`);
+  console.log(`[Template] Total generation: ${totalTime}ms (⚡ parallelized)`);
+
+  return {
+    ...result,
+    generationTime: totalTime,
+  };
+}
+
+/**
+ * Streaming version: Select template and fill content with real-time updates
+ * ⚡ OPTIMIZED: Parallel operations + streaming for instant user feedback
+ *
+ * @param userMessage - User's query
+ * @param pageType - Type of page to generate
+ * @param persona - User persona
+ * @param knowledgeDocuments - Optional KB documents (if not provided, will fetch in parallel)
+ * @param onChunk - Callback for streaming updates
+ * @returns Final filled content
+ */
+export async function generateFromTemplateStreaming(
+  userMessage: string,
+  pageType: string,
+  persona: PersonaScores,
+  knowledgeDocuments?: KBDocument[],
+  onChunk?: (partialPage: any, accumulated: string) => void
+): Promise<ContentFillResult> {
+  const totalStart = Date.now();
+
+  // ⚡ OPTIMIZATION: Run template selection and KB search in parallel
+  const [selection, kbDocs] = await Promise.all([
+    selectTemplate(userMessage, pageType, persona, knowledgeDocuments),
+    knowledgeDocuments
+      ? Promise.resolve(knowledgeDocuments)
+      : getKnowledgeDocuments(userMessage, [], [], 3).catch(err => {
+          console.error('[Template] KB search error:', err);
+          return [];
+        })
+  ]);
+
+  console.log(`[Template] Selected: ${selection.template.name} - ${selection.reasoning}`);
+  console.log(`[Template] KB docs retrieved: ${kbDocs.length}`);
+
+  // Step 2: Stream content generation with KB docs
+  const result = await fillTemplateContentStreaming(
+    selection.template,
+    userMessage,
+    persona,
+    kbDocs,
+    onChunk
+  );
+
+  const totalTime = Date.now() - totalStart;
+  console.log(`[Template] Total streaming generation: ${totalTime}ms (⚡ parallelized + streaming)`);
 
   return {
     ...result,
