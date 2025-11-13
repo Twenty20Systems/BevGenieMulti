@@ -1,10 +1,18 @@
-"use client"
+'use client';
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Menu, X, User, LogOut } from "lucide-react"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+import { Separator } from "@/components/ui/separator"
+import { Menu, User, LogOut, Home as HomeIcon } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 
 interface NavigationProps {
@@ -12,9 +20,14 @@ interface NavigationProps {
   onHomeClick?: () => void;
 }
 
+/**
+ * Production-ready Navigation Component
+ * Built with Tailwind CSS + shadcn/ui components
+ * Professional B2B SaaS navigation with responsive mobile Sheet
+ */
 export function Navigation({ onProfileClick, onHomeClick }: NavigationProps = {}) {
   const [isScrolled, setIsScrolled] = useState(false)
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(false)
   const { user, loading, signOut } = useAuth()
 
   useEffect(() => {
@@ -27,74 +40,102 @@ export function Navigation({ onProfileClick, onHomeClick }: NavigationProps = {}
 
   const handleSignOut = async () => {
     await signOut()
-    setIsMobileMenuOpen(false)
+    setIsOpen(false)
+  }
+
+  const handleNavClick = (callback?: () => void) => {
+    callback?.()
+    setIsOpen(false)
   }
 
   return (
     <nav
       className={`fixed top-0 left-0 right-0 z-[60] transition-all duration-300 ${
-        isScrolled ? "bg-[#0A1930]/95 backdrop-blur-sm shadow-lg" : "bg-gradient-to-b from-[#0A1930] to-transparent"
+        isScrolled
+          ? "bg-slate-950/95 backdrop-blur-lg shadow-lg border-b border-slate-800"
+          : "bg-gradient-to-b from-slate-950 via-slate-950/80 to-transparent"
       }`}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-4">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
+
           {/* Logo */}
-          <Link href="/" className="flex items-center flex-shrink-0">
+          <Link
+            href="/"
+            className="flex items-center space-x-2 group"
+            onClick={() => handleNavClick(onHomeClick)}
+          >
             <Image
               src="/images/bevgenie-logo.png"
               alt="BevGenie"
               width={140}
               height={40}
-              className="h-8 w-auto"
+              className="h-8 w-auto transition-opacity group-hover:opacity-80"
               priority
             />
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-4 lg:gap-6 flex-shrink-0">
-            <button
+          <div className="hidden md:flex items-center gap-2 lg:gap-3">
+            <Button
+              variant="ghost"
               onClick={onHomeClick}
-              className="text-[#FFFFFF] hover:text-[#00C8FF] transition-colors font-medium whitespace-nowrap"
+              className="text-slate-300 hover:text-white hover:bg-slate-800/50 font-medium transition-colors"
             >
+              <HomeIcon className="w-4 h-4 mr-2" />
               Home
-            </button>
-            <Link href="/about" className="text-[#FFFFFF] hover:text-[#00C8FF] transition-colors font-medium whitespace-nowrap">
-              About Us
+            </Button>
+
+            <Link href="/about">
+              <Button
+                variant="ghost"
+                className="text-slate-300 hover:text-white hover:bg-slate-800/50 font-medium transition-colors"
+              >
+                About Us
+              </Button>
             </Link>
+
+            <Separator orientation="vertical" className="h-8 bg-slate-800" />
 
             {!loading && (
               <>
                 {user ? (
-                  // Show user info and logout when logged in
+                  // Authenticated State
                   <>
-                    <button
+                    <Button
+                      variant="ghost"
                       onClick={onProfileClick}
-                      className="flex items-center gap-2 px-3 py-2 text-[#FFFFFF] hover:text-[#00C8FF] hover:bg-white/10 rounded-lg transition-colors whitespace-nowrap"
+                      className="text-slate-300 hover:text-cyan-400 hover:bg-slate-800/50 transition-colors"
                       title="View Your Profile"
                     >
-                      <User size={20} />
+                      <User className="w-4 h-4 mr-2" />
                       <span className="hidden lg:inline">{user.email?.split('@')[0]}</span>
-                    </button>
-                    <button
+                    </Button>
+
+                    <Button
+                      variant="ghost"
                       onClick={handleSignOut}
-                      className="flex items-center gap-2 px-3 py-2 text-[#FFFFFF] hover:text-red-400 hover:bg-white/10 rounded-lg transition-colors whitespace-nowrap"
+                      className="text-slate-300 hover:text-red-400 hover:bg-slate-800/50 transition-colors"
                       title="Sign out"
                     >
-                      <LogOut size={20} />
+                      <LogOut className="w-4 h-4 mr-2" />
                       <span className="hidden lg:inline">Logout</span>
-                    </button>
+                    </Button>
                   </>
                 ) : (
-                  // Show login/signup when not logged in
+                  // Unauthenticated State
                   <>
-                    <Link
-                      href="/login"
-                      className="text-[#FFFFFF] hover:text-[#00C8FF] transition-colors font-medium whitespace-nowrap"
-                    >
-                      Login
+                    <Link href="/login">
+                      <Button
+                        variant="ghost"
+                        className="text-slate-300 hover:text-white hover:bg-slate-800/50 font-medium transition-colors"
+                      >
+                        Login
+                      </Button>
                     </Link>
+
                     <Link href="/signup">
-                      <Button className="bg-[#00C8FF] text-[#0A1930] hover:bg-[#00C8FF]/90 font-semibold whitespace-nowrap px-4">
+                      <Button className="bg-cyan-600 hover:bg-cyan-700 text-white font-semibold shadow-lg shadow-cyan-600/25 transition-all">
                         Sign Up
                       </Button>
                     </Link>
@@ -103,94 +144,115 @@ export function Navigation({ onProfileClick, onHomeClick }: NavigationProps = {}
               </>
             )}
 
-            <Button className="bg-white/10 text-[#FFFFFF] hover:bg-white/20 font-semibold whitespace-nowrap px-4 border border-[#00C8FF]/30">
+            <Button
+              className="bg-slate-800/50 backdrop-blur-sm hover:bg-slate-700/50 text-white font-semibold border border-cyan-500/30 hover:border-cyan-500/50 transition-all"
+            >
               Talk to an expert
             </Button>
           </div>
 
-          {/* Mobile Menu Button */}
-          <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="md:hidden text-[#FFFFFF] p-2"
-            aria-label="Toggle menu"
-          >
-            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
-        </div>
+          {/* Mobile Menu - shadcn/ui Sheet */}
+          <div className="md:hidden">
+            <Sheet open={isOpen} onOpenChange={setIsOpen}>
+              <SheetTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-slate-300 hover:text-white hover:bg-slate-800/50"
+                  aria-label="Toggle menu"
+                >
+                  <Menu className="w-6 h-6" />
+                </Button>
+              </SheetTrigger>
 
-        {/* Mobile Menu */}
-        {isMobileMenuOpen && (
-          <div className="md:hidden py-4 border-t border-[#00C8FF]/20">
-            <div className="flex flex-col gap-4">
-              <button
-                onClick={() => {
-                  onHomeClick?.();
-                  setIsMobileMenuOpen(false);
-                }}
-                className="text-[#FFFFFF] hover:text-[#00C8FF] transition-colors font-medium py-2 text-left"
+              <SheetContent
+                side="right"
+                className="w-[300px] sm:w-[400px] bg-slate-950 border-slate-800"
               >
-                Home
-              </button>
-              <Link
-                href="/about"
-                className="text-[#FFFFFF] hover:text-[#00C8FF] transition-colors font-medium py-2"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                About Us
-              </Link>
+                <SheetHeader>
+                  <SheetTitle className="text-white font-display text-xl">
+                    Menu
+                  </SheetTitle>
+                </SheetHeader>
 
-              {!loading && (
-                <>
-                  {user ? (
-                    // Show user info and logout in mobile menu
+                <div className="flex flex-col gap-4 mt-8">
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleNavClick(onHomeClick)}
+                    className="justify-start text-slate-300 hover:text-white hover:bg-slate-800/50 h-12"
+                  >
+                    <HomeIcon className="w-5 h-5 mr-3" />
+                    Home
+                  </Button>
+
+                  <Link href="/about" onClick={() => setIsOpen(false)}>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start text-slate-300 hover:text-white hover:bg-slate-800/50 h-12"
+                    >
+                      About Us
+                    </Button>
+                  </Link>
+
+                  <Separator className="bg-slate-800" />
+
+                  {!loading && (
                     <>
-                      <button
-                        onClick={() => {
-                          onProfileClick?.();
-                          setIsMobileMenuOpen(false);
-                        }}
-                        className="flex items-center gap-2 text-[#FFFFFF] hover:text-[#00C8FF] transition-colors font-medium py-2"
-                      >
-                        <User size={20} />
-                        <span>{user.email}</span>
-                      </button>
-                      <button
-                        onClick={handleSignOut}
-                        className="flex items-center gap-2 text-[#FFFFFF] hover:text-red-400 transition-colors font-medium py-2"
-                      >
-                        <LogOut size={20} />
-                        <span>Logout</span>
-                      </button>
-                    </>
-                  ) : (
-                    // Show login/signup in mobile menu
-                    <>
-                      <Link
-                        href="/login"
-                        className="text-[#FFFFFF] hover:text-[#00C8FF] transition-colors font-medium py-2"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                      >
-                        Login
-                      </Link>
-                      <Link
-                        href="/signup"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                      >
-                        <Button className="bg-[#00C8FF] text-[#0A1930] hover:bg-[#00C8FF]/90 font-semibold w-full">
-                          Sign Up
-                        </Button>
-                      </Link>
+                      {user ? (
+                        // Mobile Authenticated State
+                        <>
+                          <Button
+                            variant="ghost"
+                            onClick={() => handleNavClick(onProfileClick)}
+                            className="justify-start text-slate-300 hover:text-cyan-400 hover:bg-slate-800/50 h-12"
+                          >
+                            <User className="w-5 h-5 mr-3" />
+                            {user.email}
+                          </Button>
+
+                          <Button
+                            variant="ghost"
+                            onClick={handleSignOut}
+                            className="justify-start text-slate-300 hover:text-red-400 hover:bg-slate-800/50 h-12"
+                          >
+                            <LogOut className="w-5 h-5 mr-3" />
+                            Logout
+                          </Button>
+                        </>
+                      ) : (
+                        // Mobile Unauthenticated State
+                        <>
+                          <Link href="/login" onClick={() => setIsOpen(false)}>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start text-slate-300 hover:text-white hover:bg-slate-800/50 h-12"
+                            >
+                              Login
+                            </Button>
+                          </Link>
+
+                          <Link href="/signup" onClick={() => setIsOpen(false)}>
+                            <Button className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-semibold h-12">
+                              Sign Up
+                            </Button>
+                          </Link>
+                        </>
+                      )}
                     </>
                   )}
-                </>
-              )}
 
-              <Button className="bg-white/10 text-[#FFFFFF] hover:bg-white/20 font-semibold w-full border border-[#00C8FF]/30">
-                Talk to an expert
-              </Button>
-            </div>
+                  <Separator className="bg-slate-800" />
+
+                  <Button
+                    className="w-full bg-slate-800/50 hover:bg-slate-700/50 text-white font-semibold border border-cyan-500/30 h-12"
+                  >
+                    Talk to an expert
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
-        )}
+        </div>
       </div>
     </nav>
   )

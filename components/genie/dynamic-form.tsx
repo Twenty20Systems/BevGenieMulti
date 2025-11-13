@@ -1,20 +1,35 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Check, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/lib/supabase/client';
 import { getFormConfig, SubmissionType } from '@/lib/forms/form-config';
 
 interface DynamicFormProps {
   onClose: () => void;
   submissionType: SubmissionType;
-  context?: string; // What led them to this form
-  sourcePage?: string; // Which page/section
+  context?: string;
+  sourcePage?: string;
 }
 
 /**
- * Dynamic Form Component
- * Adapts fields based on submission type using form-config
+ * Production-ready Dynamic Form Component
+ * Built with shadcn/ui Dialog, Form, Input, Select, Textarea components
+ * Professional B2B SaaS form with validation and proper UX
  */
 export function DynamicForm({
   onClose,
@@ -39,7 +54,6 @@ export function DynamicForm({
     setErrorMessage('');
 
     try {
-      // Prepare submission data
       const submissionData = {
         submission_type: submissionType,
         context: context || null,
@@ -49,7 +63,6 @@ export function DynamicForm({
         created_at: new Date().toISOString()
       };
 
-      // Insert into Supabase
       const { error } = await supabase
         .from('cta_submissions')
         .insert([submissionData]);
@@ -76,125 +89,163 @@ export function DynamicForm({
   };
 
   const renderField = (field: typeof formConfig.fields[0]) => {
-    const commonClasses = "w-full px-4 py-3 bg-[#152238] border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-[#00C8FF] transition-colors";
-
     switch (field.type) {
       case 'textarea':
         return (
-          <textarea
+          <Textarea
             required={field.required}
             value={formData[field.name] || ''}
             onChange={(e) => handleChange(field.name, e.target.value)}
-            rows={4}
-            className={`${commonClasses} resize-none`}
             placeholder={field.placeholder}
+            rows={4}
+            className="bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-cyan-500 focus:ring-cyan-500/20"
           />
         );
 
       case 'select':
         return (
-          <select
+          <Select
             required={field.required}
             value={formData[field.name] || ''}
-            onChange={(e) => handleChange(field.name, e.target.value)}
-            className={commonClasses}
+            onValueChange={(value) => handleChange(field.name, value)}
           >
-            {field.options?.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="bg-slate-900/50 border-slate-700 text-white focus:border-cyan-500 focus:ring-cyan-500/20">
+              <SelectValue placeholder={field.placeholder} />
+            </SelectTrigger>
+            <SelectContent className="bg-slate-900 border-slate-700">
+              {field.options?.map(option => (
+                <SelectItem
+                  key={option.value}
+                  value={option.value}
+                  className="text-white focus:bg-slate-800 focus:text-white"
+                >
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         );
 
       default:
         return (
-          <input
+          <Input
             type={field.type}
             required={field.required}
             value={formData[field.name] || ''}
             onChange={(e) => handleChange(field.name, e.target.value)}
-            className={commonClasses}
             placeholder={field.placeholder}
+            className="bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-cyan-500 focus:ring-cyan-500/20"
           />
         );
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0A1930]/90 backdrop-blur-sm">
-      <div className="bg-[#0D1B2E] border border-white/10 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl bg-slate-950 border-slate-800 text-white max-h-[90vh] overflow-y-auto">
 
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-white/10">
-          <div>
-            <h2 className="text-2xl font-bold text-white">{formConfig.title}</h2>
-            <p className="text-[#94A3B8] text-sm mt-1">
-              {formConfig.subtitle}
-            </p>
+        <DialogHeader>
+          <div className="flex items-start justify-between">
+            <div className="space-y-2 flex-1">
+              <DialogTitle className="text-2xl font-display font-bold text-white">
+                {formConfig.title}
+              </DialogTitle>
+              <DialogDescription className="text-slate-400 text-base">
+                {formConfig.subtitle}
+              </DialogDescription>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              className="text-slate-400 hover:text-white hover:bg-slate-800/50 flex-shrink-0"
+            >
+              <X className="w-5 h-5" />
+            </Button>
           </div>
-          <button
-            onClick={onClose}
-            className="text-white/60 hover:text-white transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
+        </DialogHeader>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-6 pt-4">
 
           {/* Dynamic Fields */}
           {formConfig.fields.map((field) => (
-            <div key={field.name}>
-              <label className="block text-white font-medium mb-2">
-                {field.label} {field.required && '*'}
-              </label>
+            <div key={field.name} className="space-y-2">
+              <Label htmlFor={field.name} className="text-white font-medium flex items-center gap-2">
+                {field.label}
+                {field.required && (
+                  <span className="text-red-400 text-sm">*</span>
+                )}
+              </Label>
               {renderField(field)}
               {field.description && (
-                <p className="text-[#94A3B8] text-xs mt-1">{field.description}</p>
+                <p className="text-slate-500 text-sm">{field.description}</p>
               )}
             </div>
           ))}
 
-          {/* Context Display (if provided) */}
+          {/* Context Display */}
           {context && (
-            <div className="bg-[#00C8FF]/10 border border-[#00C8FF]/20 rounded-lg p-4">
-              <p className="text-[#00C8FF] text-sm font-medium">Interest Context:</p>
-              <p className="text-white/80 text-sm mt-1">{context}</p>
-            </div>
-          )}
-
-          {/* Submit Button */}
-          <div className="pt-4">
-            <button
-              type="submit"
-              disabled={isSubmitting || submitStatus === 'success'}
-              className="w-full px-6 py-4 bg-[#00C8FF] hover:bg-[#0891B2] text-white font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            <Badge
+              variant="outline"
+              className="bg-cyan-500/10 text-cyan-300 border-cyan-500/30 px-4 py-2 text-sm"
             >
-              {isSubmitting ? 'Submitting...' : submitStatus === 'success' ? 'Sent!' : formConfig.submitButtonText}
-            </button>
-          </div>
+              <span className="font-medium">Interest Context:</span> {context}
+            </Badge>
+          )}
 
           {/* Status Messages */}
           {submitStatus === 'success' && (
-            <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
-              <p className="text-green-400 text-sm">
-                ✓ {formConfig.successMessage}
-              </p>
-            </div>
+            <Alert className="bg-green-500/10 border-green-500/30">
+              <Check className="w-4 h-4 text-green-400" />
+              <AlertDescription className="text-green-400">
+                {formConfig.successMessage}
+              </AlertDescription>
+            </Alert>
           )}
 
           {submitStatus === 'error' && (
-            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
-              <p className="text-red-400 text-sm">
-                ✗ {errorMessage || 'Something went wrong. Please try again or email us at support@bevgenie.com'}
-              </p>
-            </div>
+            <Alert className="bg-red-500/10 border-red-500/30">
+              <AlertCircle className="w-4 h-4 text-red-400" />
+              <AlertDescription className="text-red-400">
+                {errorMessage || 'Something went wrong. Please try again or email us at support@bevgenie.com'}
+              </AlertDescription>
+            </Alert>
           )}
 
+          {/* Submit Button */}
+          <div className="flex gap-3 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className="flex-1 border-slate-700 hover:bg-slate-800/50 text-white"
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={isSubmitting || submitStatus === 'success'}
+              className="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold shadow-lg shadow-cyan-600/25 disabled:opacity-50"
+            >
+              {isSubmitting ? (
+                <>
+                  <span className="animate-pulse">Submitting...</span>
+                </>
+              ) : submitStatus === 'success' ? (
+                <>
+                  <Check className="w-4 h-4 mr-2" />
+                  Sent!
+                </>
+              ) : (
+                formConfig.submitButtonText
+              )}
+            </Button>
+          </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
